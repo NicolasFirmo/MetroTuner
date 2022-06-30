@@ -11,8 +11,8 @@ int main(int /*argc*/, char * /*argv*/[]) {
 	const auto height = displayMode.h;
 
 	SDL_Window *window = SDL_CreateWindow(
-		"SDL2 window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-		width, height, SDL_WINDOW_OPENGL);
+		"SDL2 window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width,
+		height, SDL_WINDOW_OPENGL);
 
 	if (window == nullptr) {
 		__android_log_print(ANDROID_LOG_ERROR, "SDL",
@@ -27,20 +27,34 @@ int main(int /*argc*/, char * /*argv*/[]) {
 
 	SDL_RenderClear(renderer);
 
-	SDL_Rect rect{.w = 500, .h = 500};
-	rect.x = (width - rect.w) / 2;
-	rect.y = (height - rect.h) / 2;
-
 	SDL_Surface *loadedImage = IMG_Load("images/diapason.png");
 	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, loadedImage);
 	SDL_FreeSurface(loadedImage);
 
-	SDL_RenderCopy(renderer, texture, nullptr, &rect);
+	SDL_Rect centerRect{.w = 512, .h = 512};
+	centerRect.x = (width - centerRect.w) / 2;
+	centerRect.y = (height - centerRect.h) / 2;
 
-	SDL_RenderPresent(renderer);
-
-	const Uint32 timeToClose = 8000;
-	SDL_Delay(timeToClose);
+	bool quit = false;
+	SDL_Event event;
+	while (!quit && SDL_WaitEvent(&event)) {
+		SDL_RenderClear(renderer);
+		switch (event.type) {
+		case SDL_QUIT: {
+			quit = true;
+			break;
+		}
+		case SDL_FINGERDOWN: {
+			SDL_SetTextureColorMod(texture, 0xff, 0xff, 0xff);
+			break;
+		}
+		default: {
+			SDL_SetTextureColorMod(texture, 0x00, 0x00, 0x00);
+		}
+		}
+		SDL_RenderCopy(renderer, texture, nullptr, &centerRect);
+		SDL_RenderPresent(renderer);
+	}
 
 	SDL_DestroyWindow(window);
 
