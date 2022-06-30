@@ -52,6 +52,13 @@ int main(int /*argc*/, char * /*argv*/[]) {
 	centerRect.x = (width - centerRect.w) / 2;
 	centerRect.y = (height - centerRect.h) / 2;
 
+	std::vector<SDL_Color> colors(4);
+	colors[0] = SDL_Color{.r = 0xff, .g = 0x00, .b = 0x00, .a = 0x00};
+	colors[1] = SDL_Color{.r = 0x00, .g = 0xff, .b = 0x00, .a = 0x00};
+	colors[2] = SDL_Color{.r = 0x00, .g = 0x00, .b = 0xff, .a = 0x00};
+	colors[3] = SDL_Color{.r = 0xff, .g = 0xff, .b = 0xff, .a = 0x00};
+	size_t colorIndex = 0;
+
 	bool quit = false;
 	SDL_Event event;
 	while (!quit && SDL_WaitEvent(&event)) {
@@ -62,7 +69,10 @@ int main(int /*argc*/, char * /*argv*/[]) {
 			break;
 		}
 		case SDL_FINGERDOWN: {
-			SDL_SetTextureColorMod(texture, 0xff, 0xff, 0xff);
+			const auto [r, g, b, a] = colors[colorIndex];
+			if (++colorIndex >= colors.size())
+				colorIndex = 0;
+			SDL_SetTextureColorMod(texture, r, g, b);
 			break;
 		}
 		default: {
@@ -77,4 +87,6 @@ int main(int /*argc*/, char * /*argv*/[]) {
 	SDL_DestroyWindow(window);
 
 	SDL_Quit();
+
+	return 0;
 }
