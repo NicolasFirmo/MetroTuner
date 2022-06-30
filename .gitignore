@@ -1,0 +1,11 @@
+# Folders
+.vscode
+.gradle
+.idea
+.cxx
+build
+CMakeFiles
+
+# Files
+local.properties
+cmake_install.cmake
