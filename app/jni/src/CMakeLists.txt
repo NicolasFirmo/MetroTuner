@@ -13,6 +13,8 @@ find_library(SDL2 SDL2)
 
 add_library(main SHARED)
 
+target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
 target_sources(main PRIVATE ${main_sources})
 
 target_precompile_headers(main PRIVATE pch.h)
