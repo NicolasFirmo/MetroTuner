@@ -1,6 +1,6 @@
 #include <SDL.h>
 #include <SDL_image.h>
-#include <android/log.h>
+#include <SDL_ttf.h>
 
 int main(int /*argc*/, char * /*argv*/[]) {
 	SDL_Init(SDL_INIT_VIDEO);
@@ -15,8 +15,8 @@ int main(int /*argc*/, char * /*argv*/[]) {
 		height, SDL_WINDOW_OPENGL);
 
 	if (window == nullptr) {
-		__android_log_print(ANDROID_LOG_ERROR, "SDL",
-							"Could not create window: %s", SDL_GetError());
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+					 "Could not create window: %s\n", SDL_GetError());
 		return 1;
 	}
 
