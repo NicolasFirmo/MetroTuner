@@ -7,6 +7,8 @@ SDL_DisplayMode App::displayMode{};
 SDL_Window *App::window = nullptr;
 SDL_Renderer *App::renderer = nullptr;
 
+TTF_Font *App::baseFont = nullptr;
+
 App::ExitCode App::init() {
 	SDL_Init(SDL_INIT_VIDEO);
 
@@ -30,6 +32,13 @@ App::ExitCode App::init() {
 		return ExitCode::applicationError;
 	}
 
+	baseFont = TTF_OpenFont("fonts/MesloLGS NF Regular.ttf", 64);
+	if (!baseFont) {
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to load font:%s\n",
+					 TTF_GetError());
+		return ExitCode::applicationError;
+	}
+
 	return ExitCode::success;
 }
 
@@ -37,13 +46,6 @@ App::ExitCode App::run() {
 	running = true;
 
 	setRendererDrawColor({.r = 0x20, .g = 0x20, .b = 0x20, .a = 0x00});
-
-	TTF_Font *baseFont = TTF_OpenFont("fonts/MesloLGS NF Regular.ttf", 64);
-	if (!baseFont) {
-		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to load font:%s\n",
-					 TTF_GetError());
-		return ExitCode::applicationError;
-	}
 
 	std::vector<SDL_Color> colors(5);
 	colors[0] = SDL_Color{.r = 0x00, .g = 0x00, .b = 0x00, .a = 0x00};

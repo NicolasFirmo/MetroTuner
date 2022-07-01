@@ -15,4 +15,6 @@ private:
 	static SDL_DisplayMode displayMode;
 	static SDL_Window *window;
 	static SDL_Renderer *renderer;
+
+	static TTF_Font *baseFont;
 };
