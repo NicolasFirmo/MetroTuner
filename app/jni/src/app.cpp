@@ -106,14 +106,12 @@ App::ExitCode App::run() {
 			break;
 		}
 		}
-
 		{
 			const auto [r, g, b, a] =
 				colors[touchCount < colors.size() ? touchCount
 												  : colors.size() - 1];
 			SDL_SetTextureColorMod(icon, r, g, b);
 		}
-
 		greetings.render(renderer, baseFont);
 
 		SDL_RenderCopy(renderer, icon, nullptr, &iconRect);
@@ -121,19 +119,21 @@ App::ExitCode App::run() {
 					   greetings.getDstRectConstPointer());
 		SDL_RenderPresent(renderer);
 	}
+	SDL_DestroyTexture(icon);
 
 	shutdown();
-
 	return ExitCode::success;
 }
 
 void App::shutdown() {
+	TTF_CloseFont(baseFont);
+	TTF_Quit();
+	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
-
 	SDL_Quit();
 }
 
-void App::setRendererDrawColor(const SDL_Color& color) {
+void App::setRendererDrawColor(const SDL_Color &color) {
 	const auto &[r, g, b, a] = color;
 	SDL_SetRenderDrawColor(renderer, r, g, b, a);
 }
