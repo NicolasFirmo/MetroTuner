@@ -3,14 +3,17 @@
 #include "text.h"
 
 bool App::running = false;
+
 SDL_DisplayMode App::displayMode{};
 SDL_Window *App::window = nullptr;
 SDL_Renderer *App::renderer = nullptr;
 
 TTF_Font *App::baseFont = nullptr;
 
+SDL_AudioDeviceID App::microphoneID{};
+
 App::ExitCode App::init() {
-	SDL_Init(SDL_INIT_VIDEO);
+	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
 	SDL_GetCurrentDisplayMode(0, &displayMode);
 
@@ -39,9 +42,40 @@ App::ExitCode App::init() {
 		return ExitCode::applicationError;
 	}
 
+	SDL_AudioSpec want, have;
+	SDL_zero(want);
+	want.freq = 48000;
+	want.format = AUDIO_F32;
+	want.channels = 1;
+	want.samples = 4096;
+	want.callback = onAudioCapturing;
+
+	microphoneID = SDL_OpenAudioDevice(nullptr, 1, &want, &have,
+									   SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+	if (microphoneID == 0) {
+		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to open audio: %s",
+					 SDL_GetError());
+		return ExitCode::audioError;
+	}
+	if (have.channels != want.channels) {
+		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "We didn't get a mono device.");
+		return ExitCode::audioError;
+	}
+	if (have.freq != want.freq) {
+		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "We didn't get a 48000Hz audio.");
+		return ExitCode::audioError;
+	}
+	if (have.format != want.format) {
+		SDL_LogError(SDL_LOG_CATEGORY_AUDIO,
+					 "We didn't get Float32 audio format.");
+		return ExitCode::audioError;
+	}
+	SDL_PauseAudioDevice(microphoneID, 0); // start audio capturing.
+
 	return ExitCode::success;
 }
 
+static float rms = 0;
 App::ExitCode App::run() {
 	running = true;
 
@@ -72,7 +106,7 @@ App::ExitCode App::run() {
 	}
 	SDL_SetTextureColorMod(icon, 0x00, 0x00, 0x00);
 
-	Text greetings("MetroTuner Initialized");
+	Text greetings{"MetroTuner Initialized"};
 	greetings.setPosition(0, 0);
 	greetings.render(renderer, baseFont);
 
@@ -126,11 +160,23 @@ App::ExitCode App::run() {
 }
 
 void App::shutdown() {
+	SDL_CloseAudioDevice(microphoneID);
 	TTF_CloseFont(baseFont);
 	TTF_Quit();
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
+}
+
+void App::onAudioCapturing(void *userdata, Uint8 *stream, int len) {
+	float *signal = reinterpret_cast<float *>(stream);
+	int signalLen = len * sizeof(Uint8) / sizeof(float);
+
+	float squaredSum = 0;
+	for (size_t i = 0; i < signalLen; i++)
+		squaredSum += signal[i] * signal[i];
+
+	rms = std::sqrt(squaredSum / signalLen);
 }
 
 void App::setRendererDrawColor(const SDL_Color &color) {
