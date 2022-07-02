@@ -16,6 +16,8 @@ include_directories(
         vendor/SDL2_gfx/include
         vendor/SDL2_mixer/include
         vendor/SDL2_ttf/include
+
+        vendor/fftw-3.3.10/api
 )
 
 add_subdirectory(vendor/SDL2)
@@ -23,5 +25,7 @@ add_subdirectory(vendor/SDL2_image)
 add_subdirectory(vendor/SDL2_gfx)
 add_subdirectory(vendor/SDL2_mixer)
 add_subdirectory(vendor/SDL2_ttf)
+
+add_subdirectory(vendor/fftw-3.3.10)
 
 add_subdirectory(src)

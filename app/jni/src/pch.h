@@ -3,6 +3,8 @@
 #include <SDL_image.h>
 #include <SDL_ttf.h>
 
+#include <fftw3.h>
+
 #include <array>
 #include <map>
 #include <set>
