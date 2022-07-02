@@ -10,7 +10,7 @@ SDL_Renderer *App::renderer = nullptr;
 
 TTF_Font *App::baseFont = nullptr;
 
-SDL_AudioDeviceID App::microphoneID{};
+Microphone<float> App::microphone{};
 
 App::ExitCode App::init() {
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
@@ -42,35 +42,33 @@ App::ExitCode App::init() {
 		return ExitCode::applicationError;
 	}
 
-	SDL_AudioSpec want, have;
-	SDL_zero(want);
-	want.freq = 48000;
-	want.format = AUDIO_F32;
-	want.channels = 1;
-	want.samples = 4096;
-	want.callback = onAudioCapturing;
+	SDL_AudioSpec desired, obtained;
+	SDL_zero(desired);
+	desired.freq = 48000;
+	desired.format = AUDIO_F32;
+	desired.channels = 1;
+	desired.samples = 4096;
+	desired.callback = onAudioCapturing;
 
-	microphoneID = SDL_OpenAudioDevice(nullptr, 1, &want, &have,
-									   SDL_AUDIO_ALLOW_FORMAT_CHANGE);
-	if (microphoneID == 0) {
+	if (microphone.init(desired, obtained) == 0) {
 		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to open audio: %s",
 					 SDL_GetError());
 		return ExitCode::audioError;
 	}
-	if (have.channels != want.channels) {
+	if (obtained.channels != desired.channels) {
 		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "We didn't get a mono device.");
 		return ExitCode::audioError;
 	}
-	if (have.freq != want.freq) {
+	if (obtained.freq != desired.freq) {
 		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "We didn't get a 48000Hz audio.");
 		return ExitCode::audioError;
 	}
-	if (have.format != want.format) {
+	if (obtained.format != desired.format) {
 		SDL_LogError(SDL_LOG_CATEGORY_AUDIO,
 					 "We didn't get Float32 audio format.");
 		return ExitCode::audioError;
 	}
-	SDL_PauseAudioDevice(microphoneID, 0); // start audio capturing.
+	SDL_PauseAudioDevice(microphone.id(), 0); // start audio capturing.
 
 	return ExitCode::success;
 }
@@ -174,7 +172,7 @@ App::ExitCode App::run() {
 }
 
 void App::shutdown() {
-	SDL_CloseAudioDevice(microphoneID);
+	microphone.shutdown();
 	TTF_CloseFont(baseFont);
 	TTF_Quit();
 	SDL_DestroyRenderer(renderer);
@@ -183,14 +181,17 @@ void App::shutdown() {
 }
 
 void App::onAudioCapturing(void *userdata, Uint8 *stream, int len) {
-	float *signal = reinterpret_cast<float *>(stream);
-	int signalLen = len * sizeof(Uint8) / sizeof(float);
+	if (!microphone.tryToWrite())
+		return;
+	SDL_memcpy(microphone.samples().data(), stream, len);
 
 	float squaredSum = 0;
-	for (size_t i = 0; i < signalLen; i++)
-		squaredSum += signal[i] * signal[i];
+	for (auto &&sample : microphone.samples())
+		squaredSum += sample * sample;
 
-	rms = std::sqrt(squaredSum / signalLen);
+	rms = std::sqrt(squaredSum / microphone.numOfSamples);
+
+	microphone.finshWriting();
 }
 
 void App::setRendererDrawColor(const SDL_Color &color) {

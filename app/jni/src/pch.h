@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
 #include <execution>
 #include <numeric>
 #include <thread>

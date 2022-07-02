@@ -1,5 +1,7 @@
 #pragma once
 
+#include "microphone.hpp"
+
 class App {
 public:
 	enum class ExitCode { success = 0, applicationError, audioError };
@@ -21,5 +23,5 @@ private:
 
 	static TTF_Font *baseFont;
 
-	static SDL_AudioDeviceID microphoneID;
+	static Microphone<float> microphone;
 };
