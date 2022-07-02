@@ -143,6 +143,21 @@ App::ExitCode App::run() {
 		}
 	}};
 
+	fftwf_complex *freqSignal = nullptr;
+	freqSignal = (fftwf_complex *)fftwf_malloc(
+		sizeof(fftwf_complex) * (microphone.numOfSamples / 2 + 1));
+	fftwf_plan plan = nullptr;
+	plan = fftwf_plan_dft_r2c_1d(microphone.numOfSamples,
+								 microphone.samples().data(), freqSignal,
+								 FFTW_ESTIMATE);
+
+	std::vector<float> hannWindow(microphone.numOfSamples);
+	std::generate(hannWindow.begin(), hannWindow.end(), [i = 0]() mutable {
+		const float hannBid =
+			0.5f * (1.0f - cos(float(2 * M_PI) * (i++ + 1) /
+							   (microphone.numOfSamples + 1)));
+		return hannBid;
+	});
 	while (running) {
 		setRendererDrawColor({.r = 0x20, .g = 0x20, .b = 0x20, .a = 0xff});
 		SDL_RenderClear(renderer);
@@ -154,19 +169,26 @@ App::ExitCode App::run() {
 			SDL_SetTextureColorMod(icon, r, g, b);
 		}
 
-		microphone.startReading();
-		{
 			SDL_Color timeSignalColor{.r = floatToUint8(std::max(.2f, rms * 5.0f)),
 								  .g = floatToUint8(5.0f - rms * 10.0f),
 								  .b = 0x40,
 								  .a = 0xff};
+		microphone.startReading();
+		{
+			std::transform(hannWindow.begin(), hannWindow.end(),
+						   microphone.samples().begin(),
+						   microphone.samples().begin(), std::multiplies{});
 
-			renderSignal(microphone.samples(), 200, displayMode.h - 800,
-						 timeSignalColor);
+			renderSignal(std::span{microphone.samples()}, 200,
+						 displayMode.h - 800, timeSignalColor);
+			fftwf_execute(plan);
 		}
 		microphone.finshReading();
 
-		micStatus.setText(makeMicRmsString(rms).c_str());
+		renderSignal<fftwf_complex, microphone.numOfSamples / 2 + 1, true>(
+			std::span<fftwf_complex, microphone.numOfSamples / 2 + 1>{
+				freqSignal, microphone.numOfSamples / 2 + 1},
+			1, 800, {.r = 0x40, .g = 0x7f, .b = 0xff, .a = 0xff});
 		micStatus.render(renderer, baseFont);
 
 		SDL_RenderCopy(renderer, icon, nullptr, &iconRect);
@@ -176,7 +198,9 @@ App::ExitCode App::run() {
 					   micStatus.getDstRectConstPointer());
 		SDL_RenderPresent(renderer);
 	}
-
+	fftwf_destroy_plan(plan);
+	fftwf_free(freqSignal);
+	fftwf_cleanup();
 	eventLoop.join();
 
 	SDL_DestroyTexture(icon);
