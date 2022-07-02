@@ -105,19 +105,25 @@ App::ExitCode App::run() {
 	}
 	SDL_SetTextureColorMod(icon, 0x00, 0x00, 0x00);
 
+	auto makeFloatLogString = [](std::string_view text,
+								 float rms) -> std::string {
+		std::stringstream stringStream;
+		stringStream << text << ": " << rms;
+		return stringStream.str();
+	};
+
 	Text greetings{"MetroTuner Initialized"};
 	greetings.setPosition(0, 0);
 	greetings.render(renderer, baseFont);
 
-	auto makeMicRmsString = [](float rms) -> std::string {
-		std::stringstream stringStream;
-		stringStream << "Mic audio rms: " << rms;
-		return stringStream.str();
-	};
-
-	Text micStatus{makeMicRmsString(rms).c_str()};
+	Text micStatus{makeFloatLogString("Mic audio rms", rms).c_str()};
 	micStatus.setPosition(0, greetings.getDstRectConstPointer()->h);
 	micStatus.render(renderer, baseFont);
+
+	Text pitchLog{makeFloatLogString("Frequency (hz)", 0).c_str()};
+	pitchLog.setPosition(0, micStatus.getDstRectConstPointer()->y +
+								micStatus.getDstRectConstPointer()->h);
+	pitchLog.render(renderer, baseFont);
 
 	int touchCount = 0;
 	std::thread eventLoop{[&]() {
@@ -169,7 +175,7 @@ App::ExitCode App::run() {
 			SDL_SetTextureColorMod(icon, r, g, b);
 		}
 
-			SDL_Color timeSignalColor{.r = floatToUint8(std::max(.2f, rms * 5.0f)),
+		SDL_Color timeSignalColor{.r = floatToUint8(std::max(.2f, rms * 5.0f)),
 								  .g = floatToUint8(5.0f - rms * 10.0f),
 								  .b = 0x40,
 								  .a = 0xff};
@@ -185,17 +191,27 @@ App::ExitCode App::run() {
 		}
 		microphone.finshReading();
 
+		const float pitch = getDominantFrequency(
+			std::span{freqSignal, microphone.numOfSamples / 2 + 1});
+
 		renderSignal<fftwf_complex, microphone.numOfSamples / 2 + 1, true>(
 			std::span<fftwf_complex, microphone.numOfSamples / 2 + 1>{
 				freqSignal, microphone.numOfSamples / 2 + 1},
 			1, 800, {.r = 0x40, .g = 0x7f, .b = 0xff, .a = 0xff});
+
+		micStatus.setText(makeFloatLogString("Mic audio rms", rms).c_str());
 		micStatus.render(renderer, baseFont);
+
+		pitchLog.setText(makeFloatLogString("Frequency (hz)", pitch).c_str());
+		pitchLog.render(renderer, baseFont);
 
 		SDL_RenderCopy(renderer, icon, nullptr, &iconRect);
 		SDL_RenderCopy(renderer, greetings.getTexture(), nullptr,
 					   greetings.getDstRectConstPointer());
 		SDL_RenderCopy(renderer, micStatus.getTexture(), nullptr,
 					   micStatus.getDstRectConstPointer());
+		SDL_RenderCopy(renderer, pitchLog.getTexture(), nullptr,
+					   pitchLog.getDstRectConstPointer());
 		SDL_RenderPresent(renderer);
 	}
 	fftwf_destroy_plan(plan);
