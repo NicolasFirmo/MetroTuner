@@ -110,28 +110,37 @@ App::ExitCode App::run() {
 	greetings.setPosition(0, 0);
 	greetings.render(renderer, baseFont);
 
-	SDL_Event event;
+	auto makeMicRmsString = [](float rms) -> std::string {
+		std::stringstream stringStream;
+		stringStream << "Mic audio rms: " << rms;
+		return stringStream.str();
+	};
+
+	Text micStatus{makeMicRmsString(rms).c_str()};
+	micStatus.setPosition(0, greetings.getDstRectConstPointer()->h);
+	micStatus.render(renderer, baseFont);
+
 	int touchCount = 0;
 	std::thread eventLoop{[&]() {
 		SDL_Event event;
-	while (running && SDL_WaitEvent(&event)) {
-		switch (event.type) {
-		case SDL_QUIT: {
-			running = false;
-			break;
-		}
-		case SDL_FINGERDOWN: {
-			++touchCount;
-			break;
-		}
-		case SDL_FINGERUP: {
-			--touchCount;
-			break;
-		}
-		case SDL_FINGERMOTION: {
-			break;
-		}
-		}
+		while (running && SDL_WaitEvent(&event)) {
+			switch (event.type) {
+			case SDL_QUIT: {
+				running = false;
+				break;
+			}
+			case SDL_FINGERDOWN: {
+				++touchCount;
+				break;
+			}
+			case SDL_FINGERUP: {
+				--touchCount;
+				break;
+			}
+			case SDL_FINGERMOTION: {
+				break;
+			}
+			}
 		}
 	}};
 
@@ -144,7 +153,9 @@ App::ExitCode App::run() {
 												  : colors.size() - 1];
 			SDL_SetTextureColorMod(icon, r, g, b);
 		}
-		greetings.render(renderer, baseFont);
+
+		micStatus.setText(makeMicRmsString(rms).c_str());
+		micStatus.render(renderer, baseFont);
 
 		SDL_RenderCopy(renderer, icon, nullptr, &iconRect);
 		SDL_RenderCopy(renderer, greetings.getTexture(), nullptr,
