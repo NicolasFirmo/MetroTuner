@@ -20,6 +20,7 @@ private:
 	static void renderSignal(std::span<SignalType, Len> signal,
 							 int amplitudeHeight, int yPos,
 							 const SDL_Color &color);
+	static float getDominantFrequency(std::span<fftwf_complex> signal);
 
 	static bool running;
 

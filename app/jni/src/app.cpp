@@ -233,6 +233,19 @@ void App::renderSignal(std::span<SignalType, Len> signal,
 	}
 }
 
+float App::getDominantFrequency(std::span<fftwf_complex> signal) {
+	size_t dominantBid = 0;
+	float maxAmplitude2 = 0;
+	for (size_t i = 0; i < signal.size(); i++) {
+		const float freqAmplitude2 = signal[i][0] * signal[i][0];
+		if (freqAmplitude2 > maxAmplitude2) {
+			maxAmplitude2 = freqAmplitude2;
+			dominantBid = i;
+		}
+	}
+	return (float)microphone.sampleRate * dominantBid / signal.size() / 2;
+}
+
 void App::onAudioCapturing(void *userdata, Uint8 *stream, int len) {
 	if (!microphone.tryToWrite())
 		return;
