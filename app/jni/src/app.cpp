@@ -2,6 +2,8 @@
 
 #include "text.h"
 
+#include "utility/float-to-uint8.h"
+
 bool App::running = false;
 
 SDL_DisplayMode App::displayMode{};
@@ -142,7 +144,7 @@ App::ExitCode App::run() {
 	}};
 
 	while (running) {
-		setRendererDrawColor({.r = 0x20, .g = 0x20, .b = 0x20, .a = 0x00});
+		setRendererDrawColor({.r = 0x20, .g = 0x20, .b = 0x20, .a = 0xff});
 		SDL_RenderClear(renderer);
 
 		{
@@ -154,7 +156,10 @@ App::ExitCode App::run() {
 
 		microphone.startReading();
 		{
-			setRendererDrawColor({.r = 0x20, .g = 0xff, .b = 0x20, .a = 0x00});
+			setRendererDrawColor({.r = floatToUint8(std::max(.2f, rms * 5.0f)),
+								  .g = floatToUint8(5.0f - rms * 10.0f),
+								  .b = 0x40,
+								  .a = 0xff});
 
 			int lastSampleAmplitude =
 				microphone.samples()[0] * 200 + displayMode.h - 800;
