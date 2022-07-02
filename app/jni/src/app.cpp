@@ -156,23 +156,13 @@ App::ExitCode App::run() {
 
 		microphone.startReading();
 		{
-			setRendererDrawColor({.r = floatToUint8(std::max(.2f, rms * 5.0f)),
+			SDL_Color timeSignalColor{.r = floatToUint8(std::max(.2f, rms * 5.0f)),
 								  .g = floatToUint8(5.0f - rms * 10.0f),
 								  .b = 0x40,
-								  .a = 0xff});
+								  .a = 0xff};
 
-			int lastSampleAmplitude =
-				microphone.samples()[0] * 200 + displayMode.h - 800;
-			int lastTCoord = 0;
-			for (size_t i = 1; i < microphone.numOfSamples; i++) {
-				const int sampleAmplitude =
-					microphone.samples()[i] * 200 + displayMode.h - 800;
-				const auto tCoord = displayMode.w * i / microphone.numOfSamples;
-				SDL_RenderDrawLine(renderer, lastTCoord, lastSampleAmplitude,
-								   tCoord, sampleAmplitude);
-				lastSampleAmplitude = sampleAmplitude;
-				lastTCoord = tCoord;
-			}
+			renderSignal(microphone.samples(), 200, displayMode.h - 800,
+						 timeSignalColor);
 		}
 		microphone.finshReading();
 
@@ -202,6 +192,24 @@ void App::shutdown() {
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
+}
+
+void App::renderSignal(const std::vector<float> &signal,
+					   const int amplitudeHeight, const int yPos,
+					   const SDL_Color &color) {
+	setRendererDrawColor(color);
+
+	int lastSampleAmplitude = signal[0] * amplitudeHeight + yPos;
+	int lastTCoord = 0;
+	const size_t numOfSamples = signal.size();
+	for (size_t i = 1; i < numOfSamples; i++) {
+		const int sampleAmplitude = signal[i] * amplitudeHeight + yPos;
+		const auto tCoord = displayMode.w * i / numOfSamples;
+		SDL_RenderDrawLine(renderer, lastTCoord, lastSampleAmplitude, tCoord,
+						   sampleAmplitude);
+		lastSampleAmplitude = sampleAmplitude;
+		lastTCoord = tCoord;
+	}
 }
 
 void App::onAudioCapturing(void *userdata, Uint8 *stream, int len) {

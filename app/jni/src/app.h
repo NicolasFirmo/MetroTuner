@@ -14,6 +14,9 @@ private:
 	static void onAudioCapturing(void *userdata, Uint8 *stream, int len);
 
 	static void setRendererDrawColor(const SDL_Color &color);
+	static void renderSignal(const std::vector<float> &signal,
+							 int amplitudeHeight, int yPos,
+							 const SDL_Color &color);
 
 	static bool running;
 
