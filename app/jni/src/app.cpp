@@ -112,8 +112,9 @@ App::ExitCode App::run() {
 
 	SDL_Event event;
 	int touchCount = 0;
+	std::thread eventLoop{[&]() {
+		SDL_Event event;
 	while (running && SDL_WaitEvent(&event)) {
-		SDL_RenderClear(renderer);
 		switch (event.type) {
 		case SDL_QUIT: {
 			running = false;
@@ -125,21 +126,18 @@ App::ExitCode App::run() {
 		}
 		case SDL_FINGERUP: {
 			--touchCount;
-			greetings.setPosition(0, 0);
 			break;
 		}
 		case SDL_FINGERMOTION: {
-			const auto fingerXPos = event.tfinger.x;
-			const auto fingerYPos = event.tfinger.y;
-			greetings.setPosition((fingerXPos * displayMode.w) / 2,
-								  (fingerYPos * displayMode.h) / 2);
-			greetings.setColor({.r = Uint8(0xff * fingerXPos),
-								.g = Uint8(0xff * fingerYPos),
-								.b = 0xff,
-								.a = 0xff});
 			break;
 		}
 		}
+		}
+	}};
+
+	while (running) {
+		SDL_RenderClear(renderer);
+
 		{
 			const auto [r, g, b, a] =
 				colors[touchCount < colors.size() ? touchCount
@@ -151,8 +149,13 @@ App::ExitCode App::run() {
 		SDL_RenderCopy(renderer, icon, nullptr, &iconRect);
 		SDL_RenderCopy(renderer, greetings.getTexture(), nullptr,
 					   greetings.getDstRectConstPointer());
+		SDL_RenderCopy(renderer, micStatus.getTexture(), nullptr,
+					   micStatus.getDstRectConstPointer());
 		SDL_RenderPresent(renderer);
 	}
+
+	eventLoop.join();
+
 	SDL_DestroyTexture(icon);
 
 	shutdown();
