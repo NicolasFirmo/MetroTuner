@@ -47,10 +47,10 @@ App::ExitCode App::init() {
 
 	SDL_AudioSpec desired, obtained;
 	SDL_zero(desired);
-	desired.freq = 48000;
+	desired.freq = microphone.sampleRate;
 	desired.format = AUDIO_F32;
 	desired.channels = 1;
-	desired.samples = 4096;
+	desired.samples = microphone.numOfSamples;
 	desired.callback = onAudioCapturing;
 
 	if (microphone.init(desired, obtained) == 0) {

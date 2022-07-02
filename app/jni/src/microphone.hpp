@@ -5,8 +5,8 @@ class Microphone {
 public:
 	using dataType = DataType;
 
-	static constexpr int numOfSamples = 4096;
-	static constexpr int sampleFrequency = 48000;
+	static constexpr int numOfSamples = 1024*16;
+	static constexpr int sampleRate = 48000;
 
 	SDL_AudioDeviceID init(const SDL_AudioSpec &desired,
 						   SDL_AudioSpec &obtained) {
@@ -17,8 +17,8 @@ public:
 	}
 	void shutdown() { SDL_CloseAudioDevice(id_); }
 
-	auto id() const { return id_; }
-	auto &samples() { return samples_; }
+	[[nodiscard]] auto id() const { return id_; }
+	[[nodiscard]] auto &samples() { return samples_; }
 
 	void startReading() {
 		std::unique_lock lock(mutex_);
