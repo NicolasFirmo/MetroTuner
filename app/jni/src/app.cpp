@@ -77,8 +77,6 @@ static float rms = 0;
 App::ExitCode App::run() {
 	running = true;
 
-	setRendererDrawColor({.r = 0x20, .g = 0x20, .b = 0x20, .a = 0x00});
-
 	std::vector<SDL_Color> colors(5);
 	colors[0] = SDL_Color{.r = 0x00, .g = 0x00, .b = 0x00, .a = 0x00};
 	colors[1] = SDL_Color{.r = 0xff, .g = 0x00, .b = 0x00, .a = 0x00};
@@ -143,6 +141,7 @@ App::ExitCode App::run() {
 	}};
 
 	while (running) {
+		setRendererDrawColor({.r = 0x20, .g = 0x20, .b = 0x20, .a = 0x00});
 		SDL_RenderClear(renderer);
 
 		{
@@ -151,6 +150,25 @@ App::ExitCode App::run() {
 												  : colors.size() - 1];
 			SDL_SetTextureColorMod(icon, r, g, b);
 		}
+
+		microphone.startReading();
+		{
+			setRendererDrawColor({.r = 0x20, .g = 0xff, .b = 0x20, .a = 0x00});
+
+			int lastSampleAmplitude =
+				microphone.samples()[0] * 200 + displayMode.h - 800;
+			int lastTCoord = 0;
+			for (size_t i = 1; i < microphone.numOfSamples; i++) {
+				const int sampleAmplitude =
+					microphone.samples()[i] * 200 + displayMode.h - 800;
+				const auto tCoord = displayMode.w * i / microphone.numOfSamples;
+				SDL_RenderDrawLine(renderer, lastTCoord, lastSampleAmplitude,
+								   tCoord, sampleAmplitude);
+				lastSampleAmplitude = sampleAmplitude;
+				lastTCoord = tCoord;
+			}
+		}
+		microphone.finshReading();
 
 		micStatus.setText(makeMicRmsString(rms).c_str());
 		micStatus.render(renderer, baseFont);
