@@ -194,19 +194,40 @@ void App::shutdown() {
 	SDL_Quit();
 }
 
-void App::renderSignal(const std::vector<float> &signal,
+template <typename SignalType, size_t Len, bool Log>
+requires std::is_same_v<SignalType, float> ||
+	std::is_same_v<SignalType, fftwf_complex>
+void App::renderSignal(std::span<SignalType, Len> signal,
 					   const int amplitudeHeight, const int yPos,
 					   const SDL_Color &color) {
 	setRendererDrawColor(color);
 
-	int lastSampleAmplitude = signal[0] * amplitudeHeight + yPos;
+	int lastSampleAmplitude;
+	if constexpr (std::is_same_v<SignalType, fftwf_complex>)
+		lastSampleAmplitude = signal[0][0] * amplitudeHeight + yPos;
+	else
+		lastSampleAmplitude = signal[0] * amplitudeHeight + yPos;
+
 	int lastTCoord = 0;
 	const size_t numOfSamples = signal.size();
+	const auto logDenominator = std::log(float(numOfSamples));
 	for (size_t i = 1; i < numOfSamples; i++) {
-		const int sampleAmplitude = signal[i] * amplitudeHeight + yPos;
-		const auto tCoord = displayMode.w * i / numOfSamples;
+		int sampleAmplitude;
+		if constexpr (std::is_same_v<SignalType, fftwf_complex>)
+			sampleAmplitude = signal[i][0] * amplitudeHeight + yPos;
+		else
+			sampleAmplitude = signal[i] * amplitudeHeight + yPos;
+
+		int tCoord;
+		if constexpr (Log) {
+			tCoord = displayMode.w * std::log(float(i)) / logDenominator;
+		} else {
+			tCoord = displayMode.w * i / numOfSamples;
+		}
+
 		SDL_RenderDrawLine(renderer, lastTCoord, lastSampleAmplitude, tCoord,
 						   sampleAmplitude);
+
 		lastSampleAmplitude = sampleAmplitude;
 		lastTCoord = tCoord;
 	}
