@@ -1,55 +1,35 @@
 #include "app.h"
 
+#include "audio.h"
+#include "screen.h"
 #include "text.h"
 
 #include "utility/float-to-uint8.h"
 
 bool App::running = false;
 
-SDL_DisplayMode App::displayMode{};
-SDL_Window *App::window = nullptr;
-SDL_Renderer *App::renderer = nullptr;
-
-TTF_Font *App::baseFont = nullptr;
-
-Microphone<float> App::microphone{};
-
 App::ExitCode App::init() {
-	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
-
-	SDL_GetCurrentDisplayMode(0, &displayMode);
-
-	window = SDL_CreateWindow("SDL2 window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-							  displayMode.w, displayMode.h, SDL_WINDOW_OPENGL);
-
-	if (window == nullptr) {
-		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Could not create window: %s\n", SDL_GetError());
+	if (int error = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO); error) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not initialize SDL (%d): %s\n", error,
+					 SDL_GetError());
+		shutdown();
 		return ExitCode::applicationError;
 	}
 
-	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-
-	if (TTF_Init() == -1) {
-		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "TTF_Init: %s\n", TTF_GetError());
+	if (!Screen::init()) {
+		shutdown();
 		return ExitCode::applicationError;
 	}
 
-	baseFont = TTF_OpenFont("fonts/MesloLGS NF Regular.ttf", 64);
-	if (!baseFont) {
-		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to load font:%s\n", TTF_GetError());
+	if (!Text::init(64)) {
+		shutdown();
 		return ExitCode::applicationError;
 	}
 
-	if (!microphone.init(1024 * 16, 48000, onAudioCapturing)) {
-		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to open microphone: %s", SDL_GetError());
+	if (!Audio::init()) {
+		shutdown();
 		return ExitCode::audioError;
 	}
-	if (microphone.numOfChannels() != 1) {
-		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Only mono sound capturing is supported!");
-		return ExitCode::audioError;
-	}
-	microphone.startCapturing();
 
 	return ExitCode::success;
 }
@@ -71,9 +51,9 @@ App::ExitCode App::run() {
 	if (SDL_Surface *loadedImage = IMG_Load("images/diapason.png"); loadedImage) {
 		iconRect.w = loadedImage->w;
 		iconRect.h = loadedImage->h;
-		iconRect.x = (displayMode.w - iconRect.w) / 2;
-		iconRect.y = (displayMode.h - iconRect.h) / 2;
-		icon = SDL_CreateTextureFromSurface(renderer, loadedImage);
+		iconRect.x = (Screen::width() - iconRect.w) / 2;
+		iconRect.y = (Screen::height() - iconRect.h) / 2;
+		icon = SDL_CreateTextureFromSurface(Screen::getRenderer(), loadedImage);
 		SDL_FreeSurface(loadedImage);
 	} else {
 		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't load PNG image: %s", SDL_GetError());
@@ -87,18 +67,9 @@ App::ExitCode App::run() {
 		return stringStream.str();
 	};
 
-	Text greetings{"MetroTuner Initialized"};
-	greetings.setPosition(0, 0);
-	greetings.render(renderer, baseFont);
-
-	Text micStatus{makeFloatLogString("Mic audio rms", rms).c_str()};
-	micStatus.setPosition(0, greetings.getDstRectConstPointer()->h);
-	micStatus.render(renderer, baseFont);
-
-	Text pitchLog{makeFloatLogString("Frequency (hz)", 0).c_str()};
-	pitchLog.setPosition(0, micStatus.getDstRectConstPointer()->y +
-								micStatus.getDstRectConstPointer()->h);
-	pitchLog.render(renderer, baseFont);
+	Text greetings{"MetroTuner Initialized", {0, 0}};
+	Text micStatus{"Mic audio rms", {0, Text::ptSize}};
+	Text pitchLog{"Frequency (hz)", {0, micStatus.position.y + Text::ptSize}};
 
 	int touchCount = 0;
 	std::thread eventLoop{[&]() {
@@ -124,20 +95,9 @@ App::ExitCode App::run() {
 		}
 	}};
 
-	FftwfComplexSignal freqSignal{size_t(microphone.numOfSamples() / 2 + 1)};
-	fftwf_plan plan = nullptr;
-	plan = fftwf_plan_dft_r2c_1d(microphone.numOfSamples(), microphone.samples().data(),
-								 freqSignal.data(), FFTW_ESTIMATE);
-
-	std::vector<float> hannWindow(microphone.numOfSamples());
-	std::generate(hannWindow.begin(), hannWindow.end(), [i = 0]() mutable {
-		const float hannBid =
-			0.5f * (1.0f - cos(float(2 * M_PI) * (i++ + 1) / (microphone.numOfSamples() + 1)));
-		return hannBid;
-	});
 	while (running) {
-		setRendererDrawColor({.r = 0x20, .g = 0x20, .b = 0x20, .a = 0xff});
-		SDL_RenderClear(renderer);
+		Screen::setDrawColor({.r = 0x20, .g = 0x20, .b = 0x20, .a = 0xff});
+		Screen::clear();
 
 		{
 			const auto [r, g, b, a] =
@@ -145,41 +105,33 @@ App::ExitCode App::run() {
 			SDL_SetTextureColorMod(icon, r, g, b);
 		}
 
-		SDL_Color timeSignalColor{.r = floatToUint8(std::max(.2f, rms * 5.0f)),
-								  .g = floatToUint8(5.0f - rms * 10.0f),
-								  .b = 0x40,
-								  .a = 0xff};
-		microphone.startReading();
+		auto rms = Audio::microphone.rms();
+
+		Audio::microphone.startReading();
 		{
-			std::transform(hannWindow.begin(), hannWindow.end(), microphone.samples().begin(),
-						   microphone.samples().begin(), std::multiplies{});
-
-			renderSignal(microphone.samples(), 200, displayMode.h - 800, timeSignalColor);
-			fftwf_execute(plan);
+			Screen::draw(Audio::microphone.signalOnTime(), 200, Screen::height() * 1 / 4,
+						 {.r = floatToUint8(std::max(.2F, rms * 5.0F)),
+						  .g = floatToUint8(5.0F - rms * 10.0F),
+						  .b = 0x40,
+						  .a = 0xff});
 		}
-		microphone.finshReading();
+		Audio::microphone.finshReading();
 
-		const float pitch = getDominantFrequency(freqSignal);
+		const float pitch = Audio::microphone.dominantFrequency();
 
-		renderSignal<ScaleMode::logarithmic>(freqSignal, 1, 800,
-											 {.r = 0x40, .g = 0x7f, .b = 0xff, .a = 0xff});
+		Screen::draw<Screen::ScaleMode::logarithmic>(Audio::microphone.signalOnFreq(), 1,
+													 Screen::height() * 3 / 4,
+													 {.r = 0x40, .g = 0x7f, .b = 0xff, .a = 0xff});
 
-		micStatus.setText(makeFloatLogString("Mic audio rms", rms).c_str());
-		micStatus.render(renderer, baseFont);
+		micStatus.text = makeFloatLogString("Mic audio rms", rms);
+		Screen::draw(micStatus);
+		pitchLog.text = makeFloatLogString("Frequency (hz)", pitch);
+		Screen::draw(pitchLog);
 
-		pitchLog.setText(makeFloatLogString("Frequency (hz)", pitch).c_str());
-		pitchLog.render(renderer, baseFont);
+		SDL_RenderCopy(Screen::getRenderer(), icon, nullptr, &iconRect);
 
-		SDL_RenderCopy(renderer, icon, nullptr, &iconRect);
-		SDL_RenderCopy(renderer, greetings.getTexture(), nullptr,
-					   greetings.getDstRectConstPointer());
-		SDL_RenderCopy(renderer, micStatus.getTexture(), nullptr,
-					   micStatus.getDstRectConstPointer());
-		SDL_RenderCopy(renderer, pitchLog.getTexture(), nullptr, pitchLog.getDstRectConstPointer());
-		SDL_RenderPresent(renderer);
+		Screen::show();
 	}
-	fftwf_destroy_plan(plan);
-	fftwf_cleanup();
 	eventLoop.join();
 
 	SDL_DestroyTexture(icon);
@@ -189,77 +141,8 @@ App::ExitCode App::run() {
 }
 
 void App::shutdown() {
-	microphone.shutdown();
-	TTF_CloseFont(baseFont);
-	TTF_Quit();
-	SDL_DestroyRenderer(renderer);
-	SDL_DestroyWindow(window);
+	Audio::shutdown();
+	Text::shutdown();
+	Screen::shutdown();
 	SDL_Quit();
-}
-
-template <App::ScaleMode Scale, class Container>
-void App::renderSignal(const Container &signal, const int amplitudeHeight, const int yPos,
-					   const SDL_Color &color) {
-	setRendererDrawColor(color);
-
-	int lastSampleAmplitude;
-	if constexpr (std::is_same_v<typename Container::value_type, fftwf_complex>)
-		lastSampleAmplitude = signal[0][0] * amplitudeHeight + yPos;
-	else
-		lastSampleAmplitude = signal[0] * amplitudeHeight + yPos;
-
-	int lastTCoord = 0;
-	const size_t numOfSamples = signal.size();
-	const auto logDenominator = std::log(float(numOfSamples));
-	for (size_t i = 1; i < numOfSamples; i++) {
-		int sampleAmplitude;
-		if constexpr (std::is_same_v<typename Container::value_type, fftwf_complex>)
-			sampleAmplitude = signal[i][0] * amplitudeHeight + yPos;
-		else
-			sampleAmplitude = signal[i] * amplitudeHeight + yPos;
-
-		int tCoord;
-		if constexpr (Scale == ScaleMode::logarithmic) {
-			tCoord = displayMode.w * std::log(float(i)) / logDenominator;
-		} else {
-			tCoord = displayMode.w * i / numOfSamples;
-		}
-
-		SDL_RenderDrawLine(renderer, lastTCoord, lastSampleAmplitude, tCoord, sampleAmplitude);
-
-		lastSampleAmplitude = sampleAmplitude;
-		lastTCoord = tCoord;
-	}
-}
-
-float App::getDominantFrequency(FftwfComplexSignal signal) {
-	size_t dominantBid = 0;
-	float maxAmplitude2 = 0;
-	for (size_t i = 0; i < signal.size(); i++) {
-		const float freqAmplitude2 = signal[i][0] * signal[i][0];
-		if (freqAmplitude2 > maxAmplitude2) {
-			maxAmplitude2 = freqAmplitude2;
-			dominantBid = i;
-		}
-	}
-	return (float)microphone.sampleRate() * dominantBid / signal.size() / 2;
-}
-
-void App::onAudioCapturing(void *userdata, Uint8 *stream, int len) {
-	if (!microphone.tryToWrite())
-		return;
-	SDL_memcpy(microphone.samples().data(), stream, len);
-
-	float squaredSum = 0;
-	for (auto &&sample : microphone.samples())
-		squaredSum += sample * sample;
-
-	rms = std::sqrt(squaredSum / microphone.numOfSamples());
-
-	microphone.finshWriting();
-}
-
-void App::setRendererDrawColor(const SDL_Color &color) {
-	const auto &[r, g, b, a] = color;
-	SDL_SetRenderDrawColor(renderer, r, g, b, a);
 }
