@@ -1,16 +1,18 @@
 #include "text.h"
 
-Text::Text(const char *text, const SDL_Color &textColor)
-	: text_(text), textColor_(textColor) {}
+Text::Text(const char *text, const SDL_Color &textColor) : text_(text), textColor_(textColor) {}
 Text::~Text() {
 	SDL_DestroyTexture(texture_);
 }
 
 Text::Text(const Text &other)
-	: text_(other.text_), texture_(nullptr), dstRect_(other.dstRect_),
+	: text_(other.text_),
+	  texture_(nullptr),
+	  dstRect_(other.dstRect_),
 	  textColor_(other.textColor_) {}
 Text::Text(Text &&other) noexcept
-	: text_(std::move(other.text_)), texture_(std::move(other.texture_)),
+	: text_(std::move(other.text_)),
+	  texture_(std::move(other.texture_)),
 	  dstRect_(std::move(other.dstRect_)),
 	  textColor_(std::move(other.textColor_)) {}
 Text &Text::operator=(const Text &other) {

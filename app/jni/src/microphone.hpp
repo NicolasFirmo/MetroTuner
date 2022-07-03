@@ -5,14 +5,12 @@ class Microphone {
 public:
 	using dataType = DataType;
 
-	static constexpr int numOfSamples = 1024*16;
+	static constexpr int numOfSamples = 1024 * 16;
 	static constexpr int sampleRate = 48000;
 
-	SDL_AudioDeviceID init(const SDL_AudioSpec &desired,
-						   SDL_AudioSpec &obtained) {
+	SDL_AudioDeviceID init(const SDL_AudioSpec &desired, SDL_AudioSpec &obtained) {
 		samples_.resize(numOfSamples);
-		id_ = SDL_OpenAudioDevice(nullptr, 1, &desired, &obtained,
-								  SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+		id_ = SDL_OpenAudioDevice(nullptr, 1, &desired, &obtained, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
 		return id_;
 	}
 	void shutdown() { SDL_CloseAudioDevice(id_); }

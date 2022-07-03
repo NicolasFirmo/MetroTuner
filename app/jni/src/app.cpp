@@ -19,13 +19,11 @@ App::ExitCode App::init() {
 
 	SDL_GetCurrentDisplayMode(0, &displayMode);
 
-	window = SDL_CreateWindow("SDL2 window", SDL_WINDOWPOS_UNDEFINED,
-							  SDL_WINDOWPOS_UNDEFINED, displayMode.w,
-							  displayMode.h, SDL_WINDOW_OPENGL);
+	window = SDL_CreateWindow("SDL2 window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+							  displayMode.w, displayMode.h, SDL_WINDOW_OPENGL);
 
 	if (window == nullptr) {
-		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-					 "Could not create window: %s\n", SDL_GetError());
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Could not create window: %s\n", SDL_GetError());
 		return ExitCode::applicationError;
 	}
 
@@ -33,15 +31,13 @@ App::ExitCode App::init() {
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
 	if (TTF_Init() == -1) {
-		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "TTF_Init: %s\n",
-					 TTF_GetError());
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "TTF_Init: %s\n", TTF_GetError());
 		return ExitCode::applicationError;
 	}
 
 	baseFont = TTF_OpenFont("fonts/MesloLGS NF Regular.ttf", 64);
 	if (!baseFont) {
-		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to load font:%s\n",
-					 TTF_GetError());
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unable to load font:%s\n", TTF_GetError());
 		return ExitCode::applicationError;
 	}
 
@@ -54,8 +50,7 @@ App::ExitCode App::init() {
 	desired.callback = onAudioCapturing;
 
 	if (microphone.init(desired, obtained) == 0) {
-		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to open audio: %s",
-					 SDL_GetError());
+		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to open audio: %s", SDL_GetError());
 		return ExitCode::audioError;
 	}
 	if (obtained.channels != desired.channels) {
@@ -67,8 +62,7 @@ App::ExitCode App::init() {
 		return ExitCode::audioError;
 	}
 	if (obtained.format != desired.format) {
-		SDL_LogError(SDL_LOG_CATEGORY_AUDIO,
-					 "We didn't get Float32 audio format.");
+		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "We didn't get Float32 audio format.");
 		return ExitCode::audioError;
 	}
 	SDL_PauseAudioDevice(microphone.id(), 0); // start audio capturing.
@@ -90,8 +84,7 @@ App::ExitCode App::run() {
 
 	SDL_Texture *icon = nullptr;
 	SDL_Rect iconRect{};
-	if (SDL_Surface *loadedImage = IMG_Load("images/diapason.png");
-		loadedImage) {
+	if (SDL_Surface *loadedImage = IMG_Load("images/diapason.png"); loadedImage) {
 		iconRect.w = loadedImage->w;
 		iconRect.h = loadedImage->h;
 		iconRect.x = (displayMode.w - iconRect.w) / 2;
@@ -99,14 +92,12 @@ App::ExitCode App::run() {
 		icon = SDL_CreateTextureFromSurface(renderer, loadedImage);
 		SDL_FreeSurface(loadedImage);
 	} else {
-		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-					 "Couldn't load PNG image: %s", SDL_GetError());
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't load PNG image: %s", SDL_GetError());
 		return ExitCode::applicationError;
 	}
 	SDL_SetTextureColorMod(icon, 0x00, 0x00, 0x00);
 
-	auto makeFloatLogString = [](std::string_view text,
-								 float rms) -> std::string {
+	auto makeFloatLogString = [](std::string_view text, float rms) -> std::string {
 		std::stringstream stringStream;
 		stringStream << text << ": " << rms;
 		return stringStream.str();
@@ -150,18 +141,16 @@ App::ExitCode App::run() {
 	}};
 
 	fftwf_complex *freqSignal = nullptr;
-	freqSignal = (fftwf_complex *)fftwf_malloc(
-		sizeof(fftwf_complex) * (microphone.numOfSamples / 2 + 1));
+	freqSignal =
+		(fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex) * (microphone.numOfSamples / 2 + 1));
 	fftwf_plan plan = nullptr;
-	plan = fftwf_plan_dft_r2c_1d(microphone.numOfSamples,
-								 microphone.samples().data(), freqSignal,
+	plan = fftwf_plan_dft_r2c_1d(microphone.numOfSamples, microphone.samples().data(), freqSignal,
 								 FFTW_ESTIMATE);
 
 	std::vector<float> hannWindow(microphone.numOfSamples);
 	std::generate(hannWindow.begin(), hannWindow.end(), [i = 0]() mutable {
 		const float hannBid =
-			0.5f * (1.0f - cos(float(2 * M_PI) * (i++ + 1) /
-							   (microphone.numOfSamples + 1)));
+			0.5f * (1.0f - cos(float(2 * M_PI) * (i++ + 1) / (microphone.numOfSamples + 1)));
 		return hannBid;
 	});
 	while (running) {
@@ -170,8 +159,7 @@ App::ExitCode App::run() {
 
 		{
 			const auto [r, g, b, a] =
-				colors[touchCount < colors.size() ? touchCount
-												  : colors.size() - 1];
+				colors[touchCount < colors.size() ? touchCount : colors.size() - 1];
 			SDL_SetTextureColorMod(icon, r, g, b);
 		}
 
@@ -181,18 +169,17 @@ App::ExitCode App::run() {
 								  .a = 0xff};
 		microphone.startReading();
 		{
-			std::transform(hannWindow.begin(), hannWindow.end(),
-						   microphone.samples().begin(),
+			std::transform(hannWindow.begin(), hannWindow.end(), microphone.samples().begin(),
 						   microphone.samples().begin(), std::multiplies{});
 
-			renderSignal(std::span{microphone.samples()}, 200,
-						 displayMode.h - 800, timeSignalColor);
+			renderSignal(std::span{microphone.samples()}, 200, displayMode.h - 800,
+						 timeSignalColor);
 			fftwf_execute(plan);
 		}
 		microphone.finshReading();
 
-		const float pitch = getDominantFrequency(
-			std::span{freqSignal, microphone.numOfSamples / 2 + 1});
+		const float pitch =
+			getDominantFrequency(std::span{freqSignal, microphone.numOfSamples / 2 + 1});
 
 		renderSignal<fftwf_complex, microphone.numOfSamples / 2 + 1, true>(
 			std::span<fftwf_complex, microphone.numOfSamples / 2 + 1>{
@@ -210,8 +197,7 @@ App::ExitCode App::run() {
 					   greetings.getDstRectConstPointer());
 		SDL_RenderCopy(renderer, micStatus.getTexture(), nullptr,
 					   micStatus.getDstRectConstPointer());
-		SDL_RenderCopy(renderer, pitchLog.getTexture(), nullptr,
-					   pitchLog.getDstRectConstPointer());
+		SDL_RenderCopy(renderer, pitchLog.getTexture(), nullptr, pitchLog.getDstRectConstPointer());
 		SDL_RenderPresent(renderer);
 	}
 	fftwf_destroy_plan(plan);
@@ -235,10 +221,8 @@ void App::shutdown() {
 }
 
 template <typename SignalType, size_t Len, bool Log>
-requires std::is_same_v<SignalType, float> ||
-	std::is_same_v<SignalType, fftwf_complex>
-void App::renderSignal(std::span<SignalType, Len> signal,
-					   const int amplitudeHeight, const int yPos,
+requires std::is_same_v<SignalType, float> || std::is_same_v<SignalType, fftwf_complex>
+void App::renderSignal(std::span<SignalType, Len> signal, const int amplitudeHeight, const int yPos,
 					   const SDL_Color &color) {
 	setRendererDrawColor(color);
 
@@ -265,8 +249,7 @@ void App::renderSignal(std::span<SignalType, Len> signal,
 			tCoord = displayMode.w * i / numOfSamples;
 		}
 
-		SDL_RenderDrawLine(renderer, lastTCoord, lastSampleAmplitude, tCoord,
-						   sampleAmplitude);
+		SDL_RenderDrawLine(renderer, lastTCoord, lastSampleAmplitude, tCoord, sampleAmplitude);
 
 		lastSampleAmplitude = sampleAmplitude;
 		lastTCoord = tCoord;
