@@ -2,6 +2,8 @@
 
 #include "microphone.hpp"
 
+#include "utility/fftwf-complex-signal.h"
+
 class App {
 public:
 	enum class ExitCode { success = 0, applicationError, audioError };
@@ -14,11 +16,11 @@ private:
 	static void onAudioCapturing(void *userdata, Uint8 *stream, int len);
 
 	static void setRendererDrawColor(const SDL_Color &color);
-	template <typename SignalType, size_t Len, bool Log = false>
-	requires std::is_same_v<SignalType, float> || std::is_same_v<SignalType, fftwf_complex>
-	static void renderSignal(std::span<SignalType, Len> signal, int amplitudeHeight, int yPos,
+	enum class ScaleMode { linear = 0, logarithmic };
+	template <ScaleMode Scale = ScaleMode::linear, class Container>
+	static void renderSignal(const Container &signal, int amplitudeHeight, int yPos,
 							 const SDL_Color &color);
-	static float getDominantFrequency(std::span<fftwf_complex> signal);
+	static float getDominantFrequency(FftwfComplexSignal signal);
 
 	static bool running;
 

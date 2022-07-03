@@ -5,44 +5,27 @@ class Microphone {
 public:
 	using dataType = DataType;
 
-	static constexpr int numOfSamples = 1024 * 16;
-	static constexpr int sampleRate = 48000;
-
-	SDL_AudioDeviceID init(const SDL_AudioSpec &desired, SDL_AudioSpec &obtained) {
-		samples_.resize(numOfSamples);
-		id_ = SDL_OpenAudioDevice(nullptr, 1, &desired, &obtained, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
-		return id_;
-	}
-	void shutdown() { SDL_CloseAudioDevice(id_); }
+	SDL_AudioDeviceID init(int numOfSamples, int sampleRate, SDL_AudioCallback callBackFn);
+	void startCapturing() const;
+	void shutdown() const;
 
 	[[nodiscard]] auto id() const { return id_; }
+	[[nodiscard]] auto sampleRate() const { return specs_.freq; }
+	[[nodiscard]] auto numOfChannels() const { return specs_.channels; }
+	[[nodiscard]] auto numOfSamples() const { return specs_.samples; }
+
 	[[nodiscard]] auto &samples() { return samples_; }
 
-	void startReading() {
-		std::unique_lock lock(mutex_);
-		conditionVariable_.wait(lock, [this] { return !wasRead_; });
-		++numOfReadingThreads_;
-	}
-	void finshReading() {
-		--numOfReadingThreads_;
-		wasRead_ = !isBeingRead();
-	}
-	bool isBeingRead() { return numOfReadingThreads_ > 0; }
+	void startReading();
+	void finshReading();
 
-	bool tryToWrite() {
-		if (!wasRead_)
-			return false;
-		mutex_.lock();
-		wasRead_ = false;
-		return true;
-	}
-	void finshWriting() {
-		mutex_.unlock();
-		conditionVariable_.notify_all();
-	}
+	bool tryToWrite();
+	void finshWriting();
 
 private:
 	SDL_AudioDeviceID id_ = 0;
+	SDL_AudioSpec specs_{};
+
 	std::vector<DataType> samples_{};
 
 	std::condition_variable conditionVariable_{};
@@ -50,3 +33,56 @@ private:
 	int numOfReadingThreads_ = 0;
 	bool wasRead_ = true;
 };
+
+template <typename DataType>
+SDL_AudioDeviceID Microphone<DataType>::init(int numOfSamples, int sampleRate,
+											 SDL_AudioCallback callBackFn) {
+	static_assert(std::is_same_v<DataType, float>, "Only float DataType supported for now!");
+
+	samples_.resize(numOfSamples);
+
+	SDL_AudioSpec desired;
+	SDL_zero(desired);
+	desired.freq = sampleRate;
+	if constexpr (std::is_same_v<DataType, float>)
+		desired.format = AUDIO_F32;
+	desired.channels = 1;
+	desired.samples = numOfSamples;
+	desired.callback = callBackFn;
+
+	return id_ = SDL_OpenAudioDevice(nullptr, 1, &desired, &specs_, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+}
+template <typename DataType>
+void Microphone<DataType>::startCapturing() const {
+	SDL_PauseAudioDevice(id_, 0);
+}
+template <typename DataType>
+void Microphone<DataType>::shutdown() const {
+	SDL_CloseAudioDevice(id_);
+}
+
+template <typename DataType>
+void Microphone<DataType>::startReading() {
+	std::unique_lock lock(mutex_);
+	conditionVariable_.wait(lock, [this] { return !wasRead_; });
+	++numOfReadingThreads_;
+}
+template <typename DataType>
+void Microphone<DataType>::finshReading() {
+	--numOfReadingThreads_;
+	wasRead_ = numOfReadingThreads_ == 0;
+}
+
+template <typename DataType>
+bool Microphone<DataType>::tryToWrite() {
+	if (!wasRead_)
+		return false;
+	mutex_.lock();
+	wasRead_ = false;
+	return true;
+}
+template <typename DataType>
+void Microphone<DataType>::finshWriting() {
+	mutex_.unlock();
+	conditionVariable_.notify_all();
+}

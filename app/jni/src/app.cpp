@@ -41,31 +41,15 @@ App::ExitCode App::init() {
 		return ExitCode::applicationError;
 	}
 
-	SDL_AudioSpec desired, obtained;
-	SDL_zero(desired);
-	desired.freq = microphone.sampleRate;
-	desired.format = AUDIO_F32;
-	desired.channels = 1;
-	desired.samples = microphone.numOfSamples;
-	desired.callback = onAudioCapturing;
-
-	if (microphone.init(desired, obtained) == 0) {
-		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to open audio: %s", SDL_GetError());
+	if (!microphone.init(1024 * 16, 48000, onAudioCapturing)) {
+		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to open microphone: %s", SDL_GetError());
 		return ExitCode::audioError;
 	}
-	if (obtained.channels != desired.channels) {
-		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "We didn't get a mono device.");
+	if (microphone.numOfChannels() != 1) {
+		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Only mono sound capturing is supported!");
 		return ExitCode::audioError;
 	}
-	if (obtained.freq != desired.freq) {
-		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "We didn't get a 48000Hz audio.");
-		return ExitCode::audioError;
-	}
-	if (obtained.format != desired.format) {
-		SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "We didn't get Float32 audio format.");
-		return ExitCode::audioError;
-	}
-	SDL_PauseAudioDevice(microphone.id(), 0); // start audio capturing.
+	microphone.startCapturing();
 
 	return ExitCode::success;
 }
@@ -140,17 +124,15 @@ App::ExitCode App::run() {
 		}
 	}};
 
-	fftwf_complex *freqSignal = nullptr;
-	freqSignal =
-		(fftwf_complex *)fftwf_malloc(sizeof(fftwf_complex) * (microphone.numOfSamples / 2 + 1));
+	FftwfComplexSignal freqSignal{size_t(microphone.numOfSamples() / 2 + 1)};
 	fftwf_plan plan = nullptr;
-	plan = fftwf_plan_dft_r2c_1d(microphone.numOfSamples, microphone.samples().data(), freqSignal,
-								 FFTW_ESTIMATE);
+	plan = fftwf_plan_dft_r2c_1d(microphone.numOfSamples(), microphone.samples().data(),
+								 freqSignal.data(), FFTW_ESTIMATE);
 
-	std::vector<float> hannWindow(microphone.numOfSamples);
+	std::vector<float> hannWindow(microphone.numOfSamples());
 	std::generate(hannWindow.begin(), hannWindow.end(), [i = 0]() mutable {
 		const float hannBid =
-			0.5f * (1.0f - cos(float(2 * M_PI) * (i++ + 1) / (microphone.numOfSamples + 1)));
+			0.5f * (1.0f - cos(float(2 * M_PI) * (i++ + 1) / (microphone.numOfSamples() + 1)));
 		return hannBid;
 	});
 	while (running) {
@@ -172,19 +154,15 @@ App::ExitCode App::run() {
 			std::transform(hannWindow.begin(), hannWindow.end(), microphone.samples().begin(),
 						   microphone.samples().begin(), std::multiplies{});
 
-			renderSignal(std::span{microphone.samples()}, 200, displayMode.h - 800,
-						 timeSignalColor);
+			renderSignal(microphone.samples(), 200, displayMode.h - 800, timeSignalColor);
 			fftwf_execute(plan);
 		}
 		microphone.finshReading();
 
-		const float pitch =
-			getDominantFrequency(std::span{freqSignal, microphone.numOfSamples / 2 + 1});
+		const float pitch = getDominantFrequency(freqSignal);
 
-		renderSignal<fftwf_complex, microphone.numOfSamples / 2 + 1, true>(
-			std::span<fftwf_complex, microphone.numOfSamples / 2 + 1>{
-				freqSignal, microphone.numOfSamples / 2 + 1},
-			1, 800, {.r = 0x40, .g = 0x7f, .b = 0xff, .a = 0xff});
+		renderSignal<ScaleMode::logarithmic>(freqSignal, 1, 800,
+											 {.r = 0x40, .g = 0x7f, .b = 0xff, .a = 0xff});
 
 		micStatus.setText(makeFloatLogString("Mic audio rms", rms).c_str());
 		micStatus.render(renderer, baseFont);
@@ -201,7 +179,6 @@ App::ExitCode App::run() {
 		SDL_RenderPresent(renderer);
 	}
 	fftwf_destroy_plan(plan);
-	fftwf_free(freqSignal);
 	fftwf_cleanup();
 	eventLoop.join();
 
@@ -220,14 +197,13 @@ void App::shutdown() {
 	SDL_Quit();
 }
 
-template <typename SignalType, size_t Len, bool Log>
-requires std::is_same_v<SignalType, float> || std::is_same_v<SignalType, fftwf_complex>
-void App::renderSignal(std::span<SignalType, Len> signal, const int amplitudeHeight, const int yPos,
+template <App::ScaleMode Scale, class Container>
+void App::renderSignal(const Container &signal, const int amplitudeHeight, const int yPos,
 					   const SDL_Color &color) {
 	setRendererDrawColor(color);
 
 	int lastSampleAmplitude;
-	if constexpr (std::is_same_v<SignalType, fftwf_complex>)
+	if constexpr (std::is_same_v<typename Container::value_type, fftwf_complex>)
 		lastSampleAmplitude = signal[0][0] * amplitudeHeight + yPos;
 	else
 		lastSampleAmplitude = signal[0] * amplitudeHeight + yPos;
@@ -237,13 +213,13 @@ void App::renderSignal(std::span<SignalType, Len> signal, const int amplitudeHei
 	const auto logDenominator = std::log(float(numOfSamples));
 	for (size_t i = 1; i < numOfSamples; i++) {
 		int sampleAmplitude;
-		if constexpr (std::is_same_v<SignalType, fftwf_complex>)
+		if constexpr (std::is_same_v<typename Container::value_type, fftwf_complex>)
 			sampleAmplitude = signal[i][0] * amplitudeHeight + yPos;
 		else
 			sampleAmplitude = signal[i] * amplitudeHeight + yPos;
 
 		int tCoord;
-		if constexpr (Log) {
+		if constexpr (Scale == ScaleMode::logarithmic) {
 			tCoord = displayMode.w * std::log(float(i)) / logDenominator;
 		} else {
 			tCoord = displayMode.w * i / numOfSamples;
@@ -256,7 +232,7 @@ void App::renderSignal(std::span<SignalType, Len> signal, const int amplitudeHei
 	}
 }
 
-float App::getDominantFrequency(std::span<fftwf_complex> signal) {
+float App::getDominantFrequency(FftwfComplexSignal signal) {
 	size_t dominantBid = 0;
 	float maxAmplitude2 = 0;
 	for (size_t i = 0; i < signal.size(); i++) {
@@ -266,7 +242,7 @@ float App::getDominantFrequency(std::span<fftwf_complex> signal) {
 			dominantBid = i;
 		}
 	}
-	return (float)microphone.sampleRate * dominantBid / signal.size() / 2;
+	return (float)microphone.sampleRate() * dominantBid / signal.size() / 2;
 }
 
 void App::onAudioCapturing(void *userdata, Uint8 *stream, int len) {
@@ -278,7 +254,7 @@ void App::onAudioCapturing(void *userdata, Uint8 *stream, int len) {
 	for (auto &&sample : microphone.samples())
 		squaredSum += sample * sample;
 
-	rms = std::sqrt(squaredSum / microphone.numOfSamples);
+	rms = std::sqrt(squaredSum / microphone.numOfSamples());
 
 	microphone.finshWriting();
 }
