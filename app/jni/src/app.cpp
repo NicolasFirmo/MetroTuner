@@ -34,7 +34,6 @@ App::ExitCode App::init() {
 	return ExitCode::success;
 }
 
-static float rms = 0;
 App::ExitCode App::run() {
 	running = true;
 

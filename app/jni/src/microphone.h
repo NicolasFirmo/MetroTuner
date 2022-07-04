@@ -8,7 +8,7 @@ public:
 	void startCapturing() const;
 	void shutdown() const;
 
-	float dominantFrequency();
+	float dominantFrequency(size_t resolution = 9);
 	float rms();
 
 	[[nodiscard]] auto id() const { return id_; }

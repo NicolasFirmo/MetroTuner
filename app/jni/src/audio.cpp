@@ -3,7 +3,7 @@
 Microphone Audio::microphone;
 
 bool Audio::init() {
-	if (!microphone.init(1024 * 16, 48000)) {
+	if (!microphone.init(1024 * 4, 48000)) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not open microphone: %s", SDL_GetError());
 		shutdown();
 		return false;

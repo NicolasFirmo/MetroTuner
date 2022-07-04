@@ -34,7 +34,7 @@ void Microphone::shutdown() const {
 	SDL_CloseAudioDevice(id_);
 }
 
-float Microphone::dominantFrequency() {
+float Microphone::dominantFrequency(const size_t resolution) {
 	size_t dominantBid = 0;
 	float maxAmplitude2 = 0;
 	for (size_t i = 0; i < signalOnFreq_.size(); i++) {
@@ -44,7 +44,20 @@ float Microphone::dominantFrequency() {
 			dominantBid = i;
 		}
 	}
-	return (float)sampleRate() * dominantBid / signalOnFreq_.size() / 2;
+
+	float dominantFrequency = .0F;
+	float amplitudeSum = .0F;
+	for (size_t i = dominantBid - resolution / 2; i < dominantBid - resolution / 2 + resolution;
+		 i++) {
+		if (i > signalOnFreq_.size())
+			continue;
+
+		amplitudeSum += signalOnFreq_[i][0] * signalOnFreq_[i][0];
+		dominantFrequency += i * signalOnFreq_[i][0] * signalOnFreq_[i][0];
+	}
+	dominantFrequency /= amplitudeSum;
+
+	return (float)sampleRate() / 2 * dominantFrequency / (signalOnFreq_.size() - 1);
 }
 float Microphone::rms() {
 	startReading();
