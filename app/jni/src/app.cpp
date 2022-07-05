@@ -4,6 +4,8 @@
 #include "screen.h"
 #include "text.h"
 
+#include "timer.h"
+
 #include "utility/float-to-uint8.h"
 
 bool App::running = false;
@@ -69,6 +71,7 @@ App::ExitCode App::run() {
 	Text greetings{"MetroTuner Initialized", {0, 0}};
 	Text micStatus{"Mic audio rms", {0, Text::ptSize}};
 	Text pitchLog{"Frequency (hz)", {0, micStatus.position.y + Text::ptSize}};
+	Text fpsLog{"FPS", {0, pitchLog.position.y + Text::ptSize}};
 
 	int touchCount = 0;
 	std::thread eventLoop{[&]() {
@@ -94,7 +97,11 @@ App::ExitCode App::run() {
 		}
 	}};
 
+	Timer timer;
 	while (running) {
+		const auto deltaT = timer.getCount();
+		timer.startCounting();
+
 		Screen::setDrawColor({.r = 0x20, .g = 0x20, .b = 0x20, .a = 0xff});
 		Screen::clear();
 
@@ -127,6 +134,8 @@ App::ExitCode App::run() {
 		Screen::draw(micStatus);
 		pitchLog.str = makeFloatLogString("Frequency (hz)", pitch, 2);
 		Screen::draw(pitchLog);
+		fpsLog.str = makeFloatLogString("FPS", 1.0f / deltaT, 2);
+		Screen::draw(fpsLog);
 
 		SDL_RenderCopy(Screen::getRenderer(), icon, nullptr, &iconRect);
 
