@@ -62,7 +62,7 @@ bool Screen::clear() {
 }
 
 bool Screen::draw(const Text &text, TTF_Font *font) {
-	auto solid = TTF_RenderText_Solid(font, text.text.data(), text.color);
+	auto solid = TTF_RenderText_Solid(font, text.str.data(), text.color);
 	if (!solid) {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Could not render text:%s\n", TTF_GetError());
 		shutdown();

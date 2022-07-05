@@ -3,7 +3,7 @@
 #include "utility/vec.hpp"
 
 struct Text {
-	std::string_view text{};
+	std::string_view str{};
 	Vec2<int> position{};
 	float size = 1.0F;
 	SDL_Color color{0xff, 0xff, 0xff, 0xff};

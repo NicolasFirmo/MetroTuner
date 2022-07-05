@@ -122,9 +122,9 @@ App::ExitCode App::run() {
 													 Screen::height() * 3 / 4,
 													 {.r = 0x40, .g = 0x7f, .b = 0xff, .a = 0xff});
 
-		micStatus.text = makeFloatLogString("Mic audio rms", rms);
+		micStatus.str = makeFloatLogString("Mic audio rms", rms);
 		Screen::draw(micStatus);
-		pitchLog.text = makeFloatLogString("Frequency (hz)", pitch);
+		pitchLog.str = makeFloatLogString("Frequency (hz)", pitch);
 		Screen::draw(pitchLog);
 
 		SDL_RenderCopy(Screen::getRenderer(), icon, nullptr, &iconRect);
