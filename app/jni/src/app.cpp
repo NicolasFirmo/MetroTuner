@@ -60,9 +60,9 @@ App::ExitCode App::run() {
 	}
 	SDL_SetTextureColorMod(icon, 0x00, 0x00, 0x00);
 
-	auto makeFloatLogString = [](std::string_view text, float rms) -> std::string {
+	auto makeFloatLogString = [](std::string_view text, float value, int precision = 3) -> std::string {
 		std::stringstream stringStream;
-		stringStream << text << ": " << rms;
+		stringStream << text << ": " << std::fixed << std::setprecision(precision) << value;
 		return stringStream.str();
 	};
 
@@ -123,9 +123,9 @@ App::ExitCode App::run() {
 													 {.r = 0x40, .g = 0x7f, .b = 0xff, .a = 0xff});
 
 		Screen::draw(greetings);
-		micStatus.str = makeFloatLogString("Mic audio rms", rms);
+		micStatus.str = makeFloatLogString("Mic audio rms", rms, 5);
 		Screen::draw(micStatus);
-		pitchLog.str = makeFloatLogString("Frequency (hz)", pitch);
+		pitchLog.str = makeFloatLogString("Frequency (hz)", pitch, 2);
 		Screen::draw(pitchLog);
 
 		SDL_RenderCopy(Screen::getRenderer(), icon, nullptr, &iconRect);

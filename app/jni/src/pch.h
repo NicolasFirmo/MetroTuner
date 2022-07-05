@@ -6,6 +6,8 @@
 #include <fftw3.h>
 
 #include <array>
+#include <iomanip>
+#include <iostream>
 #include <map>
 #include <set>
 #include <span>
