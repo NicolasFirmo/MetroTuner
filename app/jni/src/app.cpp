@@ -122,6 +122,7 @@ App::ExitCode App::run() {
 													 Screen::height() * 3 / 4,
 													 {.r = 0x40, .g = 0x7f, .b = 0xff, .a = 0xff});
 
+		Screen::draw(greetings);
 		micStatus.str = makeFloatLogString("Mic audio rms", rms);
 		Screen::draw(micStatus);
 		pitchLog.str = makeFloatLogString("Frequency (hz)", pitch);
