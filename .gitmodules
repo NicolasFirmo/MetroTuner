@@ -1,0 +1,3 @@
+[submodule "app/jni/vendor/fmt"]
+	path = app/jni/vendor/fmt
+	url = https://github.com/fmtlib/fmt.git

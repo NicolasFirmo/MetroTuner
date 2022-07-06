@@ -28,4 +28,6 @@ add_subdirectory(vendor/SDL2_ttf)
 
 add_subdirectory(vendor/fftw-3.3.10)
 
+add_subdirectory(vendor/fmt)
+
 add_subdirectory(src)

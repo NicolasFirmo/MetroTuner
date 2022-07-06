@@ -5,6 +5,8 @@
 
 #include <fftw3.h>
 
+#include <fmt/format.h>
+
 #include <array>
 #include <iomanip>
 #include <iostream>
