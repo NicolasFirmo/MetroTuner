@@ -15,8 +15,7 @@ static constexpr std::array<double, 108> frequencies{
 
 Note::Note(const double frequency) : frequency_(frequency), note_(frequencies.size()), cents_(0) {
 	if (frequency >= frequencies[0]) {
-		while (frequencies[--note_] > frequency) {
-		}
+		while (frequencies[--note_] > frequency) {}
 
 		const auto aboveNoteFreq = frequencies[static_cast<Name>(note_ + 1)];
 		cents_ = 1200 * log2(aboveNoteFreq / frequency);
