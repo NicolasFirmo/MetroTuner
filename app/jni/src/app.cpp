@@ -4,6 +4,7 @@
 #include "screen.h"
 #include "text.h"
 
+#include "notes.h"
 #include "timer.h"
 
 #include "utility/float-to-uint8.h"
@@ -63,9 +64,10 @@ App::ExitCode App::run() {
 	SDL_SetTextureColorMod(icon, 0x00, 0x00, 0x00);
 
 	Text greetings{.str = "MetroTuner Initialized", .position = {0, 0}};
-	Text micStatus{.position = {0, Text::ptSize}};
+	Text fpsLog{.position = {0, Text::ptSize}};
+	Text micStatus{.position = {0, fpsLog.position.y + Text::ptSize}};
 	Text pitchLog{.position = {0, micStatus.position.y + Text::ptSize}};
-	Text fpsLog{.position = {0, pitchLog.position.y + Text::ptSize}};
+	Text noteLog{.position = {0, pitchLog.position.y + Text::ptSize}};
 
 	int touchCount = 0;
 	std::thread eventLoop{[&]() {
@@ -118,6 +120,7 @@ App::ExitCode App::run() {
 		Audio::microphone.finshReading();
 
 		const float pitch = Audio::microphone.dominantFrequency();
+		const Note note{pitch};
 
 		Screen::draw<Screen::ScaleMode::logarithmic>(Audio::microphone.signalOnFreq(), 1,
 													 Screen::height() * 3 / 4,
@@ -126,10 +129,12 @@ App::ExitCode App::run() {
 		Screen::draw(greetings);
 		micStatus.str = fmt::format("Mic audio rms: {:.5f}", rms);
 		Screen::draw(micStatus);
-		pitchLog.str = fmt::format("Frequency: {:.2f}hz", pitch);
-		Screen::draw(pitchLog);
 		fpsLog.str = fmt::format("Frame rate: {:.2f}fps", 1.0f / deltaT);
 		Screen::draw(fpsLog);
+		pitchLog.str = fmt::format("Frequency: {:.2f}hz", pitch);
+		Screen::draw(pitchLog);
+		noteLog.str = fmt::format("Note {} {:.2f} cents", note.getSharpName(), note.getCents());
+		Screen::draw(noteLog);
 
 		SDL_RenderCopy(Screen::getRenderer(), icon, nullptr, &iconRect);
 
