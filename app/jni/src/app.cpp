@@ -37,6 +37,13 @@ App::ExitCode App::init() {
 	return ExitCode::success;
 }
 
+void App::shutdown() {
+	Audio::shutdown();
+	Text::shutdown();
+	Screen::shutdown();
+	SDL_Quit();
+}
+
 App::ExitCode App::run() {
 	running = true;
 
@@ -69,29 +76,7 @@ App::ExitCode App::run() {
 	Text pitchLog{.position = {0, micStatus.position.y + Text::ptSize}};
 	Text noteLog{.position = {0, pitchLog.position.y + Text::ptSize}};
 
-	int touchCount = 0;
-	std::thread eventLoop{[&]() {
-		SDL_Event event;
-		while (running && SDL_WaitEvent(&event)) {
-			switch (event.type) {
-			case SDL_QUIT: {
-				running = false;
-				break;
-			}
-			case SDL_FINGERDOWN: {
-				++touchCount;
-				break;
-			}
-			case SDL_FINGERUP: {
-				--touchCount;
-				break;
-			}
-			case SDL_FINGERMOTION: {
-				break;
-			}
-			}
-		}
-	}};
+	std::thread eventLoop{onEvent};
 
 	Timer timer;
 	while (running) {
@@ -100,12 +85,6 @@ App::ExitCode App::run() {
 
 		Screen::setDrawColor({.r = 0x20, .g = 0x20, .b = 0x20, .a = 0xff});
 		Screen::clear();
-
-		{
-			const auto [r, g, b, a] =
-				colors[touchCount < colors.size() ? touchCount : colors.size() - 1];
-			SDL_SetTextureColorMod(icon, r, g, b);
-		}
 
 		auto rms = Audio::microphone.rms();
 
@@ -148,9 +127,14 @@ App::ExitCode App::run() {
 	return ExitCode::success;
 }
 
-void App::shutdown() {
-	Audio::shutdown();
-	Text::shutdown();
-	Screen::shutdown();
-	SDL_Quit();
+void App::onEvent() {
+	SDL_Event event;
+	while (running && SDL_WaitEvent(&event)) {
+		switch (event.type) {
+		case SDL_QUIT: {
+			running = false;
+			break;
+		}
+		}
+	}
 }

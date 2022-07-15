@@ -9,6 +9,7 @@ public:
 	static void shutdown();
 
 private:
+	static void onEvent();
 
 	static bool running;
 };
